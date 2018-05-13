@@ -24,7 +24,7 @@ private:
         }
     };
 
-    long long Size(Vertex_ *t) {
+    long long Size(Vertex_ *t) const {
         return (!t ? 0 : t->Size_);
     }
 
@@ -44,29 +44,41 @@ private:
         theFirst->isOrdered_ = theFirst->isReverseOrdered_ = true;
     }
 
+    void pushReverse(Vertex_ *theFirst){
+        std::swap(theFirst->isOrdered_, theFirst->isReverseOrdered_);
+        std::swap(theFirst->LeftKey_, theFirst->RightKey_);
+        std::swap(theFirst->left_, theFirst->right_);
+        theFirst->isReverse = false;
+        if (theFirst->left_)theFirst->left_->isReverse ^= true;
+        if (theFirst->right_)theFirst->right_->isReverse ^= true;
+    }
+
+    void pushSetZero(Vertex_ *theFirst) {
+        update_SetZero(theFirst->left_);
+        update_SetZero(theFirst->right_);
+        if (theFirst->left_)theFirst->left_->isSetZero = true;
+        if (theFirst->right_)theFirst->right_->isSetZero = true;
+        theFirst->isSetZero = false;
+    }
+
+    void pushSubtree (Vertex_ *theFirst) {
+        update_Add(theFirst->left_, theFirst->PushSubtree_);
+        update_Add(theFirst->right_, theFirst->PushSubtree_);
+        if (theFirst->left_)theFirst->left_->PushSubtree_ += theFirst->PushSubtree_;
+        if (theFirst->right_)theFirst->right_->PushSubtree_ += theFirst->PushSubtree_;
+        theFirst->PushSubtree_ = 0;
+    }
+
     void push(Vertex_ *theFirst) {
         if (theFirst == nullptr) return;
         if (theFirst->isReverse) {
-            std::swap(theFirst->isOrdered_, theFirst->isReverseOrdered_);
-            std::swap(theFirst->LeftKey_, theFirst->RightKey_);
-            std::swap(theFirst->left_, theFirst->right_);
-            theFirst->isReverse = false;
-            if (theFirst->left_)theFirst->left_->isReverse ^= true;
-            if (theFirst->right_)theFirst->right_->isReverse ^= true;
+            pushReverse(theFirst);
         }
         if (theFirst->isSetZero) {
-            update_SetZero(theFirst->left_);
-            update_SetZero(theFirst->right_);
-            if (theFirst->left_)theFirst->left_->isSetZero = true;
-            if (theFirst->right_)theFirst->right_->isSetZero = true;
-            theFirst->isSetZero = false;
+            pushSetZero(theFirst);
         }
         if (theFirst->PushSubtree_ != 0) {
-            update_Add(theFirst->left_, theFirst->PushSubtree_);
-            update_Add(theFirst->right_, theFirst->PushSubtree_);
-            if (theFirst->left_)theFirst->left_->PushSubtree_ += theFirst->PushSubtree_;
-            if (theFirst->right_)theFirst->right_->PushSubtree_ += theFirst->PushSubtree_;
-            theFirst->PushSubtree_ = 0;
+            pushSubtree(theFirst);
         }
     }
 
