@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <ctime>
 #include <tuple>
+#include <functional>
 
 class Treap{
 private:
@@ -137,8 +138,8 @@ private:
         update_(theFirst);
         return std :: make_pair(l,r);
     }
-
-    static std :: pair <Vertex_ *, Vertex_ *> split_key_(Vertex_ *theFirst, long long key) {
+    template <typename Comp>
+    static std :: pair <Vertex_ *, Vertex_ *> split_key_(Vertex_ *theFirst, long long key, Comp comp) {
         Vertex_ *r, *l;
         if (theFirst == nullptr) {
             r = nullptr;
@@ -146,11 +147,12 @@ private:
             return std :: make_pair(l, r);
         }
         push_(theFirst);
-        if (key < theFirst->key_) {
-            std :: tie(l, theFirst->left_) = split_key_(theFirst->left_, key);
+        //if (key < theFirst->key_) {
+        if(comp(key, theFirst->key_)){
+            std :: tie(l, theFirst->left_) = split_key_(theFirst->left_, key, comp);
             r = theFirst;
         } else {
-            std :: tie(theFirst->right_, r) = split_key_(theFirst->right_, key);
+            std :: tie(theFirst->right_, r) = split_key_(theFirst->right_, key, comp);
             l = theFirst;
         }
         update_(theFirst);
@@ -226,18 +228,12 @@ private:
         std :: tie(treeLeft, treeRight) = split_(theFirst, len - 1);
         std :: tie(NowNode, treeRight) = split_(treeRight, 1);
         Vertex_ *treeRight_Left, *treeRight_Right, *SwapElement;
-        if (isOrdered) {
-            setReversing_(treeRight);
-            std::tie(treeRight_Left, treeRight_Right) = split_key_(treeRight, NowNode->key_);
-            std::tie(SwapElement, treeRight_Right) = split_(treeRight_Right, 1);
-            theFirst = merge_({treeLeft, SwapElement, treeRight_Left, NowNode, treeRight_Right});
-        } else {
-            std :: tie(treeRight_Left, treeRight_Right) = split_key_(treeRight, NowNode->key_ - 1);
-            std :: tie(treeRight_Left, SwapElement) = split_(treeRight_Left, Size_(treeRight_Left) - 1);
-            setReversing_(treeRight_Right);
-            setReversing_(treeRight_Left);
-            theFirst = merge_({treeLeft, SwapElement, treeRight_Right, NowNode, treeRight_Left});
-        }
+        setReversing_(treeRight);
+        std::tie(treeRight_Left, treeRight_Right) = isOrdered ?
+                                                    split_key_(treeRight, NowNode->key_, std::less<long long>()):
+                                                    split_key_(treeRight, NowNode->key_, std::greater<long long>());
+        std::tie(SwapElement, treeRight_Right) = split_(treeRight_Right, 1);
+        theFirst = merge_({treeLeft, SwapElement, treeRight_Left, NowNode, treeRight_Right});
         return theFirst;
     }
 
