@@ -1,22 +1,33 @@
 #include <iostream>
 #include <algorithm>
 #include <ctime>
+#include <tuple>
 
 class Treap{
 private:
+
+    static int myRand_(){
+        static std::mt19937 generator;
+        static std::uniform_int_distribution <int> distributor;
+        return distributor(generator);
+    }
+
     struct Vertex_ {
-        long long priority_;
+        int priority_;
         long long key_, LeftKey_, RightKey_, PushSubtree_, SummSubtree_;
-        bool isOrdered_, isReverseOrdered_;
-        bool isReverse;
-        bool isSetZero;
+        bool isOrdered_[2];
+        bool isReverse_;
+        bool isSetZero_;
         long long Size_;
         Vertex_ *left_;
         Vertex_ *right_;
 
-        Vertex_(long long Key) : priority_(rand()), key_(Key), LeftKey_(Key), RightKey_(Key),
-                                 isOrdered_(true), isReverseOrdered_(true), isReverse(false), isSetZero(false),
-                                 SummSubtree_(key_), PushSubtree_(0), Size_(1), left_(nullptr), right_(nullptr) {}
+        Vertex_(long long Key) : priority_(myRand_()), key_(Key), LeftKey_(Key), RightKey_(Key),
+                                 isReverse_(false), isSetZero_(false),
+                                 SummSubtree_(key_), PushSubtree_(0), Size_(1), left_(nullptr), right_(nullptr) {
+            isOrdered_[0] = true;
+            isOrdered_[1] = true;
+        }
 
         ~Vertex_() {
             delete left_;
@@ -24,77 +35,82 @@ private:
         }
     };
 
-    long long Size(Vertex_ *t) const {
-        return (!t ? 0 : t->Size_);
+    static long long Size_(Vertex_ *theFirst){
+        return (!theFirst ? 0 : theFirst->Size_);
     }
 
-    void update_Add(Vertex_ *theFirst, long long x) {
-        if (!theFirst)return;
+    static void updateAdd_(Vertex_ *theFirst, const long long &x) {
+        if (!theFirst)
+            return;
         theFirst->key_ += x;
         theFirst->LeftKey_ += x;
         theFirst->RightKey_ += x;
-        theFirst->SummSubtree_ += x * Size(theFirst);
+        theFirst->SummSubtree_ += x * Size_(theFirst);
 
     }
 
-    void update_SetZero(Vertex_ *theFirst) {
-        if (theFirst == nullptr) return;
+    static void updateSetZero_(Vertex_ *theFirst) {
+        if (theFirst == nullptr)
+            return;
         theFirst->key_ = theFirst->LeftKey_ = theFirst->RightKey_ = theFirst->SummSubtree_ = 0;
         theFirst->PushSubtree_ = 0;
-        theFirst->isOrdered_ = theFirst->isReverseOrdered_ = true;
+        theFirst->isOrdered_[0] = theFirst->isOrdered_[1] = true;
     }
 
-    void pushReverse(Vertex_ *theFirst){
-        std::swap(theFirst->isOrdered_, theFirst->isReverseOrdered_);
+    static void pushReverse_(Vertex_ *theFirst){
+        std::swap(theFirst->isOrdered_[0], theFirst->isOrdered_[1]);
         std::swap(theFirst->LeftKey_, theFirst->RightKey_);
         std::swap(theFirst->left_, theFirst->right_);
-        theFirst->isReverse = false;
-        if (theFirst->left_)theFirst->left_->isReverse ^= true;
-        if (theFirst->right_)theFirst->right_->isReverse ^= true;
+        theFirst->isReverse_ = false;
+        for (auto &i:{theFirst->left_, theFirst->right_})
+            if (i)
+                i->isReverse_ ^= true;
     }
 
-    void pushSetZero(Vertex_ *theFirst) {
-        update_SetZero(theFirst->left_);
-        update_SetZero(theFirst->right_);
-        if (theFirst->left_)theFirst->left_->isSetZero = true;
-        if (theFirst->right_)theFirst->right_->isSetZero = true;
-        theFirst->isSetZero = false;
+    static void pushSetZero_(Vertex_ *theFirst) {
+        for (auto &i:{theFirst->left_, theFirst->right_}){
+            updateSetZero_(i);
+            if(i)
+                i -> isSetZero_= true;
+        }
+        theFirst->isSetZero_ = false;
     }
 
-    void pushSubtree (Vertex_ *theFirst) {
-        update_Add(theFirst->left_, theFirst->PushSubtree_);
-        update_Add(theFirst->right_, theFirst->PushSubtree_);
-        if (theFirst->left_)theFirst->left_->PushSubtree_ += theFirst->PushSubtree_;
-        if (theFirst->right_)theFirst->right_->PushSubtree_ += theFirst->PushSubtree_;
+    static void pushSubtree_(Vertex_ *theFirst) {
+        for (auto &i:{theFirst->left_, theFirst->right_}){
+            updateAdd_(i, theFirst->PushSubtree_);
+            if (i)
+                i->PushSubtree_ += theFirst->PushSubtree_;
+        }
         theFirst->PushSubtree_ = 0;
     }
 
-    void push(Vertex_ *theFirst) {
+    static void push_(Vertex_ *theFirst) {
         if (theFirst == nullptr) return;
-        if (theFirst->isReverse) {
-            pushReverse(theFirst);
+        if (theFirst->isReverse_) {
+            pushReverse_(theFirst);
         }
-        if (theFirst->isSetZero) {
-            pushSetZero(theFirst);
+        if (theFirst->isSetZero_) {
+            pushSetZero_(theFirst);
         }
         if (theFirst->PushSubtree_ != 0) {
-            pushSubtree(theFirst);
+            pushSubtree_(theFirst);
         }
     }
 
-    void update(Vertex_ *theFirst) {
-        if (theFirst == nullptr) return;
-        push(theFirst->left_);
-        push(theFirst->right_);
-        theFirst->Size_ = 1 + Size(theFirst->left_) + Size(theFirst->right_);
-        theFirst->isOrdered_ = (theFirst->left_ ? theFirst->left_->isOrdered_ : true) &
-                               (theFirst->right_ ? theFirst->right_->isOrdered_ : true) &
-                               (theFirst->left_ ? theFirst->left_->RightKey_ <= theFirst->key_ : true) &
-                               (theFirst->right_ ? theFirst->key_ <= theFirst->right_->LeftKey_ : true);
-        theFirst->isReverseOrdered_ = (theFirst->left_ ? theFirst->left_->isReverseOrdered_ : true) &
-                                      (theFirst->right_ ? theFirst->right_->isReverseOrdered_ : true) &
-                                      (theFirst->left_ ? theFirst->left_->RightKey_ >= theFirst->key_ : true) &
-                                      (theFirst->right_ ? theFirst->key_ >= theFirst->right_->LeftKey_ : true);
+    static void update_(Vertex_ *theFirst) {
+        if (theFirst == nullptr)
+            return;
+        push_(theFirst->left_);
+        push_(theFirst->right_);
+        theFirst->Size_ = 1 + Size_(theFirst->left_) + Size_(theFirst->right_);
+        for (int i = 0; i < 2; ++i)
+            theFirst->isOrdered_[i] = (theFirst->left_ ? theFirst->left_->isOrdered_[i] : true) &
+                                  (theFirst->right_ ? theFirst->right_->isOrdered_[i] : true) &
+                                  (theFirst->left_ ? (i ^ theFirst->left_->RightKey_ < theFirst->key_) ||
+                                          theFirst->left_->RightKey_ == theFirst->key_ : true) &
+                                  (theFirst->right_ ? (i ^ theFirst->key_ < theFirst->right_->LeftKey_) ||
+                                          theFirst->key_ == theFirst->right_->LeftKey_ : true);
 
         theFirst->LeftKey_ = (theFirst->left_ ? theFirst->left_->LeftKey_ : theFirst->key_);
         theFirst->RightKey_ = (theFirst->right_ ? theFirst->right_->RightKey_ : theFirst->key_);
@@ -102,292 +118,507 @@ private:
                                  (theFirst->right_ ? theFirst->right_->SummSubtree_ : 0LL);
     }
 
-    std :: pair <Vertex_ *, Vertex_ *> split(Vertex_ *theFirst, long long key, long long add = 0) {
+    static std :: pair <Vertex_ *, Vertex_ *> split_(Vertex_ *theFirst, long long key, long long add = 0) {
         Vertex_ *r, *l;
-        std :: pair <Vertex_ *, Vertex_ *> temp;
         if (theFirst == nullptr) {
             r = nullptr;
             l = nullptr;
             return std :: make_pair(l, r);
         }
-        push(theFirst);
-        long long curKey = add + Size(theFirst->left_);
+        push_(theFirst);
+        long long curKey = add + Size_(theFirst->left_);
         if (key <= curKey) {
-            temp = split(theFirst->left_, key, add);
-            l = temp.first;
-            theFirst->left_ = temp.second;
+            std::tie(l, theFirst->left_) = split_(theFirst->left_, key, add);
             r = theFirst;
         } else {
-            temp = split(theFirst->right_, key, add + 1 + Size(theFirst->left_));
-            theFirst->right_ = temp.first;
-            r = temp.second;
+            std :: tie(theFirst->right_, r) = split_(theFirst->right_, key, add + 1 + Size_(theFirst->left_));
             l = theFirst;
         }
-        update(theFirst);
+        update_(theFirst);
         return std :: make_pair(l,r);
     }
 
-    void split(Vertex_ *theFirst, Vertex_ *&l, Vertex_ *&r, long long key, long long add = 0) {
+    static std :: pair <Vertex_ *, Vertex_ *> split_key_(Vertex_ *theFirst, long long key) {
+        Vertex_ *r, *l;
         if (theFirst == nullptr) {
             r = nullptr;
             l = nullptr;
-            return;
+            return std :: make_pair(l, r);
         }
-        push(theFirst);
-        long long curKey = add + Size(theFirst->left_);
-        if (key <= curKey) {
-            split(theFirst->left_, l, theFirst->left_, key, add);
+        push_(theFirst);
+        if (key < theFirst->key_) {
+            std :: tie(l, theFirst->left_) = split_key_(theFirst->left_, key);
             r = theFirst;
         } else {
-            split(theFirst->right_, theFirst->right_, r, key, add + 1 + Size(theFirst->left_));
+            std :: tie(theFirst->right_, r) = split_key_(theFirst->right_, key);
             l = theFirst;
         }
-        update(theFirst);
+        update_(theFirst);
+        return std :: make_pair(l, r);
     }
 
-    void split_key(Vertex_ *theFirst, Vertex_ *&l, Vertex_ *&r, long long key) {
-        if (theFirst == nullptr) {
-            r = nullptr;
-            l = nullptr;
-            return;
-        }
-        push(theFirst);
-        if (key < theFirst->key_) {
-            split_key(theFirst->left_, l, theFirst->left_, key);
-            r = theFirst;
-        } else {
-            split_key(theFirst->right_, theFirst->right_, r, key);
-            l = theFirst;
-        }
-        update(theFirst);
-    }
-    Vertex_ *merge(Vertex_ *l, Vertex_ *r) {
-        push(l);
-        push(r);
-        if (l == nullptr)return r;
-        else if (r == nullptr)return l;
+    static Vertex_ *merge_(Vertex_ *l, Vertex_ *r) {
+        push_(l);
+        push_(r);
+        if (l == nullptr)
+            return r;
+        else if (r == nullptr)
+            return l;
         else if (l->priority_ > r->priority_) {
-            l->right_ = merge(l->right_, r);
-            update(l);
+            l->right_ = merge_(l->right_, r);
+            update_(l);
             return l;
         } else {
-            r->left_ = merge(l, r->left_);
-            update(r);
+            r->left_ = merge_(l, r->left_);
+            update_(r);
             return r;
         }
     }
 
-    long long FindLenOrderedSuffix(Vertex_ *t) {
-        if (t == nullptr)return 0;
-        push(t);
-        push(t->left_);
-        push(t->right_);
-        if (t->left_) {
-            push(t->left_->left_);
-            push(t->left_->right_);
+    static Vertex_ *merge_(std::vector<Vertex_ *> Vertexes){
+        for (size_t i = 1; i < Vertexes.size(); ++i) {
+            Vertexes[0] = merge_(Vertexes[0], Vertexes[i]);
         }
-        if (t->right_) {
-            push(t->right_->left_);
-            push(t->right_->right_);
-        }
-        if (t->right_ && !t->right_->isOrdered_) {
-            return 1 + Size(t->left_) + FindLenOrderedSuffix(t->right_);
-        }
-        if (t->right_ && t->key_ > t->right_->LeftKey_) {
-            return 1 + Size(t->left_);
-        }
-        if (t->left_ && t->key_ < t->left_->RightKey_) {
-            return Size(t->left_);
-        }
-        return FindLenOrderedSuffix(t->left_);
+        return Vertexes[0];
     }
 
-    long long FindLenReverseOrderedSuffix(Vertex_ *theFirst) {
-        if (theFirst == nullptr)return 0;
-        push(theFirst);
-        push(theFirst->left_);
-        push(theFirst->right_);
-        if (theFirst->left_) {
-            push(theFirst->left_->left_);
-            push(theFirst->left_->right_);
+    static long long findLenOrderedSuffix_(Vertex_ *theFirst, bool notReversed) {
+        if (theFirst == nullptr)
+            return 0;
+        push_(theFirst);
+        for(auto &i:{theFirst->left_, theFirst->right_}){
+            push_(i);
+            if(i){
+                for(auto &j:{i->left_, i->right_}){
+                     push_(j);
+                }
+            }
         }
-        if (theFirst->right_) {
-            push(theFirst->right_->left_);
-            push(theFirst->right_->right_);
+        if (theFirst->right_ && !theFirst->right_->isOrdered_[!notReversed]) {
+            return 1 + Size_(theFirst->left_) + findLenOrderedSuffix_(theFirst->right_, notReversed);
         }
-        if (theFirst->right_ && !theFirst->right_->isReverseOrdered_) {
-            return 1 + Size(theFirst->left_) + FindLenReverseOrderedSuffix(theFirst->right_);
+        if ( (notReversed)? (theFirst->right_ && theFirst->key_ > theFirst->right_->LeftKey_) :
+             (theFirst->right_ && theFirst->key_ < theFirst->right_->LeftKey_)) {
+            return 1 + Size_(theFirst->left_);
         }
-        if (theFirst->right_ && theFirst->key_ < theFirst->right_->LeftKey_) {
-            return 1 + Size(theFirst->left_);
+        if ((notReversed)? (theFirst->left_ && theFirst->key_ < theFirst->left_->RightKey_) :
+            (theFirst->left_ && theFirst->key_ > theFirst->left_->RightKey_) ) {
+            return Size_(theFirst->left_);
         }
-        if (theFirst->left_ && theFirst->key_ > theFirst->left_->RightKey_) {
-            return Size(theFirst->left_);
-        }
-        return FindLenReverseOrderedSuffix(theFirst->left_);
+        return findLenOrderedSuffix_(theFirst->left_, notReversed);
     }
-    void out(Vertex_ *theFirst, std::vector<long long> &Result) {
-        if (theFirst == nullptr) return;
-        push(theFirst);
-        out(theFirst->left_, Result);
+
+    static void setReversing_(Vertex_ *theFirst){
+        if (theFirst == nullptr)
+            return;
+        theFirst -> isReverse_ = true;
+        push_(theFirst);
+    }
+
+    template<bool isOrdered>
+    static Vertex_ *permutation_(Vertex_ *theFirst){
+        if (theFirst->isOrdered_[isOrdered]) {
+            setReversing_(theFirst);
+            return theFirst;
+        }
+        Vertex_ *treeLeft, *NowNode, *treeRight;
+        long long len = findLenOrderedSuffix_(theFirst, !isOrdered);
+        std :: tie(treeLeft, treeRight) = split_(theFirst, len - 1);
+        std :: tie(NowNode, treeRight) = split_(treeRight, 1);
+        Vertex_ *treeRight_Left, *treeRight_Right, *SwapElement;
+        if (isOrdered) {
+            setReversing_(treeRight);
+            std::tie(treeRight_Left, treeRight_Right) = split_key_(treeRight, NowNode->key_);
+            std::tie(SwapElement, treeRight_Right) = split_(treeRight_Right, 1);
+            theFirst = merge_({treeLeft, SwapElement, treeRight_Left, NowNode, treeRight_Right});
+        } else {
+            std :: tie(treeRight_Left, treeRight_Right) = split_key_(treeRight, NowNode->key_ - 1);
+            std :: tie(treeRight_Left, SwapElement) = split_(treeRight_Left, Size_(treeRight_Left) - 1);
+            setReversing_(treeRight_Right);
+            setReversing_(treeRight_Left);
+            theFirst = merge_({treeLeft, SwapElement, treeRight_Right, NowNode, treeRight_Left});
+        }
+        return theFirst;
+    }
+
+    static void out_(Vertex_ *theFirst, std::vector<long long> &Result) {
+        if (theFirst == nullptr)
+            return;
+        push_(theFirst);
+        out_(theFirst->left_, Result);
         Result.push_back(theFirst->key_);
-        out(theFirst->right_, Result);
+        out_(theFirst->right_, Result);
     }
 
-    Vertex_ * Root;
+    Vertex_ *Root_;
+
+    template<typename Function>
+    Vertex_ * makeOperation_(long long l, long long r, Function f){
+        Vertex_ *first, *second, *third;
+        std :: tie(second, third) = split_(Root_, r + 1);
+        std :: tie(first, second) = split_(second, l);
+
+        second = f(second);
+
+        Root_ = merge_({first, second, third});
+    }
+
 public:
-    Treap() : Root(nullptr){}
+
+    Treap() : Root_(nullptr){}
+
     ~Treap(){
-        delete Root;
+        delete Root_;
     }
 
     long long SummInSegment( long long l, long long r) {
-        Vertex_ *first, *second, *third;
-        split(Root, second, third, r + 1);
-        split(second, first, second, l);
-        long long Summ = second->SummSubtree_;
-        Root = merge(merge(first, second), third);
+        long long Summ = 0;
+        makeOperation_(l, r, [&Summ](Vertex_ *subTree) -> Vertex_ * {
+            Summ = subTree->SummSubtree_;
+            return subTree;
+        });
+
         return Summ;
     }
 
     void Insert( int pos, long long x) {
-        Vertex_ *first, *second;
-        split(Root, first, second, pos);
-        Root = merge(merge(first, new Vertex_(x)), second);
+        makeOperation_(pos, pos - 1, [this, &x](Vertex_ *subTree) -> Vertex_ * {
+            subTree = new Vertex_(x);
+            return subTree;
+        });
     }
 
     void Remove( long long pos) {
-        Vertex_ *first, *second, *third;
-        split(Root, first, second, pos);
-        split(second, second, third, 1);
-        delete second;
-        Root = merge(first, third);
+        makeOperation_(pos, pos, [](Vertex_ *subTree) -> Vertex_ * {
+            delete subTree;
+            return nullptr;
+        });
     }
 
     void Add( long long x, long long l, long long r) {
-        Vertex_ *first, *second, *third;
-        split(Root, second, third, r + 1);
-        split(second, first, second, l);
-        second->PushSubtree_ += x;
-        update_Add(second, x);
-        Root = merge(merge(first, second), third);
+        makeOperation_(l, r, [this, &x](Vertex_ *subTree) -> Vertex_ * {
+            subTree->PushSubtree_ += x;
+            updateAdd_(subTree, x);
+            return subTree;
+        });
     }
 
     void Set( long long x, long long l, long long r) {
-        Vertex_ *first, *second, *third;
-        split(Root, second, third, r + 1);
-        split(second, first, second, l);
-        second->isSetZero = true;
-        update_SetZero(second);
-        second->PushSubtree_ = x;
-        update_Add(second, x);
-        Root = merge(merge(first, second), third);
+        makeOperation_(l, r, [this, &x](Vertex_ *subTree) -> Vertex_ * {
+
+            subTree->isSetZero_ = true;
+            updateSetZero_(subTree);
+            subTree->PushSubtree_ = x;
+            updateAdd_(subTree, x);
+            return subTree;
+        });
     }
 
-    void NextPermutation( long long l, long long r) {
-        Vertex_ *RootLeft, *RootRight;
-        split(Root, Root, RootRight, r + 1);
-        split(Root, RootLeft, Root, l);
-        if (Root->isReverseOrdered_) {
-            Root->isReverse = true;
-            Root = merge(merge(RootLeft, Root), RootRight);
-            return;
-        }
-
-        Vertex_ *tLeft, *NowNode, *tRight;
-        long long len = FindLenReverseOrderedSuffix(Root);
-        split(Root, tLeft, tRight, len - 1);
-        split(tRight, NowNode, tRight, 1);
-        tRight->isReverse = true;
-        Vertex_ *tRight_Left, *tRight_Right, *SwapElement;
-        split_key(tRight, tRight_Left, tRight_Right, NowNode->key_);
-        split(tRight_Right, SwapElement, tRight_Right, 1);
-        Root = merge(merge(merge(merge(tLeft, SwapElement), tRight_Left), NowNode), tRight_Right);
-
-        Root = merge(merge(RootLeft, Root), RootRight);
+    void NextPermutation(long long l, long long r){
+        makeOperation_(l, r, [this](Vertex_ *subTree) -> Vertex_ * {
+            subTree = permutation_<true>(subTree);
+            return subTree;
+        });
     }
 
-    void PrevPermutation( long long l, long long r) {
-        Vertex_ *RootLeft, *RootRight;
-        split(Root, Root, RootRight, r + 1);
-        split(Root, RootLeft, Root, l);
-        if (Root->isOrdered_) {
-            Root->isReverse = true;
-            Root = merge(merge(RootLeft, Root), RootRight);
-            return;
-        }
-
-        long long len = FindLenOrderedSuffix(Root);
-        Vertex_ *tLeft, *NowNode, *tRight;
-        split(Root, tLeft, tRight, len - 1);
-        split(tRight, NowNode, tRight, 1);
-        Vertex_ *tRight_Left, *tRight_Right, *SwapElement;
-        split_key(tRight, tRight_Left, tRight_Right, NowNode->key_ - 1);
-        split(tRight_Left, tRight_Left, SwapElement, Size(tRight_Left) - 1);
-
-        if (tRight_Right)tRight_Right->isReverse = true;
-        if (tRight_Left)tRight_Left->isReverse = true;
-        Root = merge(merge(merge(merge(tLeft, SwapElement), tRight_Right), NowNode), tRight_Left);
-
-        Root = merge(merge(RootLeft, Root), RootRight);
+    void PrevPermutation(long long l, long long r){
+        makeOperation_(l, r, [this](Vertex_ *subTree) -> Vertex_ * {
+            subTree = permutation_<false>(subTree);
+            return subTree;
+        });
     }
 
-    void print () {
+    std :: vector<long long> GetArray() {
         std::vector<long long> all;
-        out(Root, all);
-        for (long long x : all) {
-            std::cout << x << " ";
-        }
-        std::cout << std::endl;
+        out_(Root_, all);
+        return all;
     }
 };
 
-int main() {
-    srand((unsigned) time(NULL));
-    Treap treap = Treap();
-    int n,i,m;
-    long long type, x, pos, l, r;
-    std::cin >> n;
-    for ( i = 0; i < n; ++i) {
-        std::cin >> x;
-        treap.Insert(i, x);
-    }
-    std::cin >> m;
-    for (i = 1; i <= m; ++i) {
+enum OperationName{
+    SummInSegment = 1,
+    Insert,
+    Remove,
+    Set,
+    Add,
+    NextPermutation,
+    PrevPermutation
+};
 
-        std::cin >> type;
+class Operation{
+protected:
+    std::vector<long long> data_;
+public:
+    Operation(std::vector<long long> &input): data_(input){};
+    Operation() = default;
+    ~Operation() = default;
+
+    virtual int GetPos()const = 0;
+    virtual long long GetLeft()const = 0;
+    virtual long long GetRight()const = 0;
+    virtual long long GetKey()const = 0;
+    virtual OperationName GetName()const = 0;
+};
+
+class OperationRemove : virtual public Operation{
+public:
+    OperationRemove(std::vector<long long> &input) : Operation(input){}
+    int GetPos() const{
+        return int(data_[0]);
+    }
+
+    long long GetLeft()const{}
+    long long GetRight()const {}
+    long long GetKey()const {}
+
+    OperationName GetName()const{
+        return Remove;
+    };
+};
+
+
+class OperationInsert : virtual public Operation{
+public:
+    OperationInsert(std::vector<long long> &input) : Operation(input){}
+    int GetPos() const{
+        return int(data_[0]);
+    }
+
+    long long GetKey() const{
+        return data_[1];
+    }
+
+    long long GetLeft()const {}
+    long long GetRight()const {}
+
+    OperationName GetName()const{
+        return Insert;
+    };
+};
+
+class OperationLeftAndRight : virtual public Operation{
+public:
+    OperationLeftAndRight() = default;
+    OperationLeftAndRight(std::vector<long long> &input) : Operation(input){}
+    int GetPos()const{}
+
+    long long GetKey()const {}
+
+    long long GetLeft() const{
+        return data_[0];
+    }
+
+    long long GetRight() const {
+        return data_[1];
+    }
+
+    virtual OperationName GetName()const = 0;
+};
+
+class OperationKeyAndLeftAndRight : virtual public Operation{
+public:
+    OperationKeyAndLeftAndRight() = default;
+    OperationKeyAndLeftAndRight(std::vector<long long> &input) : Operation(input){}
+    int GetPos() const {}
+    long long GetKey() const{
+        return data_[0];
+    }
+
+    long long GetLeft() const{
+        return data_[1];
+    }
+
+    long long GetRight() const{
+        return data_[2];
+    }
+
+    virtual OperationName GetName()const = 0;
+};
+
+class OperationSumm : public OperationLeftAndRight{
+public:
+    OperationSumm(std::vector<long long> &input) : Operation(input){}
+    OperationName GetName()const{
+        return SummInSegment;
+    }
+};
+
+class OperationPrevPerm : public OperationLeftAndRight{
+public:
+    OperationPrevPerm(std::vector<long long> &input) : Operation(input){}
+    OperationName GetName()const{
+        return PrevPermutation;
+    }
+};
+
+
+class OperationNextPerm : public OperationLeftAndRight{
+public:
+    OperationNextPerm(std::vector<long long> &input) : Operation(input){}
+    OperationName GetName()const{
+        return NextPermutation;
+    }
+};
+
+class OperationSet : public OperationKeyAndLeftAndRight{
+public:
+    OperationSet(std::vector<long long> &input) : Operation(input){}
+    OperationName GetName()const{
+        return Set;
+    }
+};
+
+class OperationAdd : public OperationKeyAndLeftAndRight{
+public:
+    OperationAdd(std::vector<long long> &input) : Operation(input){}
+    OperationName GetName()const{
+        return Add;
+    }
+};
+
+struct Input{
+    std :: vector <long long> InputTreap;
+    std :: vector<Operation*> array;
+};
+
+struct Output{
+    std :: vector <long long> Results;
+    std :: vector <long long> OutputTreap;
+};
+
+Input getInput(std :: istream& in) {
+    Input input;
+    size_t countOfVertex, countOfQuestions;
+    int i;
+    long long type, pos, left, right, Key;
+    in >> countOfVertex;
+    for (i = 0; i < countOfVertex; ++i) {
+        in >> Key;
+        input.InputTreap.push_back(Key);
+    }
+    in >> countOfQuestions;
+    std :: vector<long long> q;
+    OperationSumm* tSum;
+    OperationSet* tSet;
+    OperationPrevPerm* tPre;
+    OperationNextPerm* tNex;
+    OperationInsert* tIns;
+    OperationRemove* tRem;
+    OperationAdd* tAdd;
+    for (i = 0; i < countOfQuestions; ++i) {
+        in >> type;
         switch (type) {
-            case 1:
-                std::cin >> l >> r;
-                std::cout << treap.SummInSegment(l, r) << std::endl;
+            case SummInSegment:
+                in >> left >> right;
+                q = {left, right};
+                tSum = new OperationSumm(q);
+                input.array.push_back(tSum);
                 break;
-            case 2:
-                std::cin >> x >> pos;
-                treap.Insert(pos, x);
+            case Insert:
+                in >> Key >> pos;
+                q = {pos, Key};
+                tIns = new OperationInsert(q);
+                input.array.push_back(tIns);
                 break;
-            case 3:
-                std::cin >> pos;
-                treap.Remove(pos);
+            case Remove:
+                in >> pos;
+                q = {pos};
+                tRem = new OperationRemove(q);
+                input.array.push_back(tRem);
                 break;
-            case 4:
-                std::cin >> x >> l >> r;
-                treap.Set(x, l, r);
+            case Set:
+                in >> Key >> left >> right;
+                q = {Key, left, right};
+                tSet = new OperationSet(q);
+                input.array.push_back(tSet);
                 break;
-            case 5:
-                std::cin >> x >> l >> r;
-                treap.Add(x, l, r);
+            case Add:
+                in >> Key >> left >> right;
+                q = {Key, left, right};
+                tAdd = new OperationAdd(q);
+                input.array.push_back(tAdd);
                 break;
-            case 6:
-                std::cin >> l >> r;
-                treap.NextPermutation(l, r);
+            case NextPermutation:
+                in >> left >> right;
+                q = {left, right};
+                tNex = new OperationNextPerm(q);
+                input.array.push_back(tNex);
                 break;
-            case 7:
-                std::cin >> l >> r;
-                treap.PrevPermutation(l, r);
+            case PrevPermutation:
+                in >> left >> right;
+                q = {left, right};
+                tPre = new OperationPrevPerm(q);
+                input.array.push_back(tPre);
                 break;
             default:
                 break;
         }
     }
-    treap.print();
+    return input;
+}
+
+Output doOperations(const Input& input){
+    Treap treap;
+    int j = 1;
+    for(auto i:input.InputTreap){
+        treap.Insert(j, i);
+        ++j;
+    }
+    Output output;
+    for(auto i:input.array){
+        switch (i->GetName()) {
+            case SummInSegment:
+                output.Results.push_back(treap.SummInSegment(i->GetLeft(), i->GetRight()));
+                break;
+            case Insert:
+                treap.Insert(i->GetPos(), i->GetKey());
+                break;
+            case Remove:
+                treap.Remove(i->GetPos());
+                break;
+            case Set:
+                treap.Set(i->GetKey(), i->GetLeft(), i->GetRight());
+                break;
+            case Add:
+                treap.Add(i->GetKey(), i->GetLeft(), i->GetRight());
+                break;
+            case NextPermutation:
+                treap.NextPermutation(i->GetLeft(), i->GetRight());
+                break;
+            case PrevPermutation:
+                treap.PrevPermutation(i->GetLeft(), i->GetRight());
+                break;
+            default:
+                break;
+        }
+    }
+    for ( auto &i:input.array){
+        i -> ~Operation();
+    }
+    output.OutputTreap = treap.GetArray();
+    return output;
+}
+
+void PrintArr(const std :: vector<long long>& arr, char sep, std :: ostream& out){
+    bool flag = false;
+    for(auto i:arr){
+        flag? out << sep: flag = true;
+        out << i;
+    }
+    out << std :: endl;
+}
+
+void doOutput(const Output& output, std :: ostream& out){
+    PrintArr(output.Results, '\n', out);
+    PrintArr(output.OutputTreap, ' ', out);
+}
+
+void run(std :: istream& in, std :: ostream& out) {
+    Input get = getInput(in);
+    Output make = doOperations(get);
+    doOutput(make, out);
+}
+
+int main(){
+    run(std::cin, std::cout);
 }
